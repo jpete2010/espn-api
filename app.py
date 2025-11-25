@@ -8,14 +8,15 @@ st.title('🏈 Fantasy Football Dashboard')
 
 year = st.number_input('Select Year:', min_value=2015, max_value=2025, value=2025, step=1)
 # Create tabs
-tab1, tab2, tab3, tab4 = st.tabs(["Power Rankings", "Team Stats", "Matchups", "Team History"])
+tab1, tab2, tab3, tab4 = st.tabs(["Power Rankings", "Player Stats", "Matchups", "Team History"])
 league = League(league_id=753911, year=year, espn_s2='AECSbKZxmko3IVdPdkTGtFd9GbPnjt8tsnNWCdt1F4%2FcDNjVw%2FBUlq25YTgworHWi2fdQvfN2VjYhHd%2FuUxab2%2BUwHM0FUh2mxUm74VT3FEJgDWGpQb8hnL4FA8AXuaTKCs%2B3RheFyHPHB8rq0%2B%2FTQzTQ7856nW3zesI%2BVrjVCY3m%2B6BaOafaytHn8eCv0FVNsOkuqvtnRyuxkWHMKDON53MvvDWpsHu3BNNTNFSwuVDq7YhogahNeHlP%2F5QOi7mRv%2BX4fnvlgigZHzvW%2BS1hsRyAjYYbiu07tk37%2BF3rjPgZw%3D%3D', swid='{D29A0BC7-76B3-4AF2-A91D-7F2ADC252CE4}')
+current_week = league.current_week
 
 with tab1:
     st.header('Power Rankings')
 
     # Week selector
-    week = st.number_input('Select Week:', min_value=1, max_value=18, value=13, step=1)
+    week = st.number_input('Select Week:', min_value=1, max_value=18, value=current_week, step=1)
 
     # Button to fetch rankings
     if st.button('Get Rankings') or 'rankings_data' not in st.session_state:
@@ -80,7 +81,7 @@ with tab2:
     with col1:
         start_week = st.number_input('Start Week:', min_value=1, max_value=18, value=1, step=1)
     with col2:
-        end_week = st.number_input('End Week:', min_value=1, max_value=18, value=18, step=1)
+        end_week = st.number_input('End Week:', min_value=1, max_value=18, value=current_week, step=1)
 
     # Team selector (optional - to filter by team)
     teams = [str(team) for team in league.teams]
@@ -206,7 +207,7 @@ with tab3:
     st.header('Head to Head')
 
     # Week selector for matchups
-    matchup_week = st.number_input('Select Week for Matchups:', min_value=1, max_value=18, value=12, step=1,
+    matchup_week = st.number_input('Select Week for Matchups:', min_value=1, max_value=18, value=current_week, step=1,
                                    key='matchup_week')
 
     if st.button('Load Matchups', key='load_matchups'):
@@ -355,7 +356,7 @@ with tab4:
     with col1:
         start_week = st.number_input('Start Week:', min_value=1, max_value=18, value=1, step=1, key='history_start')
     with col2:
-        end_week = st.number_input('End Week:', min_value=1, max_value=18, value=12, step=1, key='history_end')
+        end_week = st.number_input('End Week:', min_value=1, max_value=18, value=current_week, step=1, key='history_end')
 
     if st.button('Load Team History'):
         with st.spinner('Loading team history...'):
