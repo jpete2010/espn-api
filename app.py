@@ -8,7 +8,7 @@ st.title('🏈 Fantasy Football Dashboard')
 
 year = st.number_input('Select Year:', min_value=2015, max_value=2025, value=2025, step=1)
 # Create tabs
-tab1, tab2, tab3 = st.tabs(["Power Rankings", "Team Stats", "Matchups"])
+tab1, tab2, tab3, tab4 = st.tabs(["Power Rankings", "Team Stats", "Matchups", "Team History"])
 league = League(league_id=753911, year=year, espn_s2='AECSbKZxmko3IVdPdkTGtFd9GbPnjt8tsnNWCdt1F4%2FcDNjVw%2FBUlq25YTgworHWi2fdQvfN2VjYhHd%2FuUxab2%2BUwHM0FUh2mxUm74VT3FEJgDWGpQb8hnL4FA8AXuaTKCs%2B3RheFyHPHB8rq0%2B%2FTQzTQ7856nW3zesI%2BVrjVCY3m%2B6BaOafaytHn8eCv0FVNsOkuqvtnRyuxkWHMKDON53MvvDWpsHu3BNNTNFSwuVDq7YhogahNeHlP%2F5QOi7mRv%2BX4fnvlgigZHzvW%2BS1hsRyAjYYbiu07tk37%2BF3rjPgZw%3D%3D', swid='{D29A0BC7-76B3-4AF2-A91D-7F2ADC252CE4}')
 
 with tab1:
@@ -343,5 +343,226 @@ with tab3:
                 "Winner Score": st.column_config.NumberColumn(format="%.2f"),
                 "Loser Score": st.column_config.NumberColumn(format="%.2f"),
                 "Margin": st.column_config.NumberColumn(format="%.2f")
+            }
+        )
+
+# Team History Tab
+with tab4:
+    st.header('Team History Across All Seasons')
+
+    # Week range selector
+    col1, col2 = st.columns(2)
+    with col1:
+        start_week = st.number_input('Start Week:', min_value=1, max_value=18, value=1, step=1, key='history_start')
+    with col2:
+        end_week = st.number_input('End Week:', min_value=1, max_value=18, value=12, step=1, key='history_end')
+
+    if st.button('Load Team History'):
+        with st.spinner('Loading team history...'):
+            team_records = {}
+            all_matchups = []
+
+            # Loop through all weeks
+            for week in range(start_week, end_week + 1):
+                box_scores = league.box_scores(week)
+
+                for box in box_scores:
+                    home_team = str(box.home_team).replace('Team(', '').replace(')', '')
+                    away_team = str(box.away_team).replace('Team(', '').replace(')', '')
+
+                    # Skip if either team is "0" or empty
+                    if home_team == '0' or away_team == '0' or not home_team.strip() or not away_team.strip():
+                        continue
+
+                    home_score = box.home_score
+                    away_score = box.away_score
+
+                    # Initialize team records if needed
+                    if home_team not in team_records:
+                        team_records[home_team] = {
+                            'wins': 0, 'losses': 0, 'ties': 0,
+                            'points_for': 0, 'points_against': 0,
+                            'matchups': []
+                        }
+                    if away_team not in team_records:
+                        team_records[away_team] = {
+                            'wins': 0, 'losses': 0, 'ties': 0,
+                            'points_for': 0, 'points_against': 0,
+                            'matchups': []
+                        }
+
+                    # Update records
+                    if home_score > away_score:
+                        team_records[home_team]['wins'] += 1
+                        team_records[away_team]['losses'] += 1
+                        result_home = 'W'
+                        result_away = 'L'
+                    elif away_score > home_score:
+                        team_records[away_team]['wins'] += 1
+                        team_records[home_team]['losses'] += 1
+                        result_home = 'L'
+                        result_away = 'W'
+                    else:
+                        team_records[home_team]['ties'] += 1
+                        team_records[away_team]['ties'] += 1
+                        result_home = 'T'
+                        result_away = 'T'
+
+                    # Update points
+                    team_records[home_team]['points_for'] += home_score
+                    team_records[home_team]['points_against'] += away_score
+                    team_records[away_team]['points_for'] += away_score
+                    team_records[away_team]['points_against'] += home_score
+
+                    # Store matchup details
+                    team_records[home_team]['matchups'].append({
+                        'week': week,
+                        'opponent': away_team,
+                        'points_for': home_score,
+                        'points_against': away_score,
+                        'result': result_home
+                    })
+                    team_records[away_team]['matchups'].append({
+                        'week': week,
+                        'opponent': home_team,
+                        'points_for': away_score,
+                        'points_against': home_score,
+                        'result': result_away
+                    })
+
+                    # Store for overall matchup list
+                    all_matchups.append({
+                        'Week': week,
+                        'Home Team': home_team,
+                        'Home Score': home_score,
+                        'Away Team': away_team,
+                        'Away Score': away_score,
+                        'Winner': home_team if home_score > away_score else away_team if away_score > home_score else 'Tie'
+                    })
+
+            st.session_state.team_records = team_records
+            st.session_state.all_matchups = all_matchups
+            st.session_state.history_weeks = (start_week, end_week)
+
+    # Display the data if available
+    if 'team_records' in st.session_state:
+        team_records = st.session_state.team_records
+        all_matchups = st.session_state.all_matchups
+        start_w, end_w = st.session_state.history_weeks
+
+        st.subheader(f'Standings (Weeks {start_w}-{end_w})')
+
+        # Create standings table
+        standings = []
+        for team, record in team_records.items():
+            total_games = record['wins'] + record['losses'] + record['ties']
+            win_pct = record['wins'] / total_games if total_games > 0 else 0
+            avg_pf = record['points_for'] / total_games if total_games > 0 else 0
+            avg_pa = record['points_against'] / total_games if total_games > 0 else 0
+
+            standings.append({
+                'Team': team,
+                'Wins': record['wins'],
+                'Losses': record['losses'],
+                'Ties': record['ties'],
+                'Win %': win_pct,
+                'Points For': record['points_for'],
+                'Points Against': record['points_against'],
+                'Point Diff': record['points_for'] - record['points_against'],
+                'Avg PF': avg_pf,
+                'Avg PA': avg_pa
+            })
+
+        df_standings = pd.DataFrame(standings)
+        df_standings = df_standings[df_standings['Team'] != '0']  # Filter out team "0"
+        df_standings = df_standings.sort_values('Wins', ascending=False)
+
+        st.dataframe(
+            df_standings,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Win %": st.column_config.NumberColumn(format="%.3f"),
+                "Points For": st.column_config.NumberColumn(format="%.2f"),
+                "Points Against": st.column_config.NumberColumn(format="%.2f"),
+                "Point Diff": st.column_config.NumberColumn(format="%.2f"),
+                "Avg PF": st.column_config.NumberColumn(format="%.2f"),
+                "Avg PA": st.column_config.NumberColumn(format="%.2f")
+            }
+        )
+
+        # Visualizations
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader('Total Points For')
+            st.bar_chart(df_standings.set_index('Team')['Points For'])
+
+        with col2:
+            st.subheader('Win Percentage')
+            st.bar_chart(df_standings.set_index('Team')['Win %'])
+
+        # Team selector for detailed view
+        st.write("---")
+        st.subheader('Team Details')
+        selected_team = st.selectbox('Select a team:', sorted(team_records.keys()))
+
+        if selected_team:
+            team_data = team_records[selected_team]
+
+            # Display team stats
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Record", f"{team_data['wins']}-{team_data['losses']}-{team_data['ties']}")
+            col2.metric("Points For", f"{team_data['points_for']:.2f}")
+            col3.metric("Points Against", f"{team_data['points_against']:.2f}")
+            col4.metric("Point Diff", f"{team_data['points_for'] - team_data['points_against']:.2f}")
+
+            # Show all matchups for this team
+            st.subheader(f"{selected_team} - All Matchups")
+            df_team_matchups = pd.DataFrame(team_data['matchups'])
+            df_team_matchups['Margin'] = df_team_matchups['points_for'] - df_team_matchups['points_against']
+
+
+            # Color code results
+            def highlight_result(row):
+                if row['result'] == 'W':
+                    return ['background-color: #28a745'] * len(row)
+                elif row['result'] == 'L':
+                    return ['background-color: #dc3545'] * len(row)
+                else:
+                    return ['background-color: #ffc107'] * len(row)
+
+
+            st.dataframe(
+                df_team_matchups.style.apply(highlight_result, axis=1),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "week": "Week",
+                    "opponent": "Opponent",
+                    "points_for": st.column_config.NumberColumn("Points For", format="%.2f"),
+                    "points_against": st.column_config.NumberColumn("Points Against", format="%.2f"),
+                    "result": "Result",
+                    "Margin": st.column_config.NumberColumn(format="%.2f")
+                }
+            )
+
+            # Weekly performance chart
+            st.subheader(f"{selected_team} - Weekly Performance")
+            weekly_chart_data = df_team_matchups[['week', 'points_for', 'points_against']].set_index('week')
+            weekly_chart_data.columns = ['Points For', 'Points Against']
+            st.line_chart(weekly_chart_data)
+
+        # All matchups table
+        st.write("---")
+        st.subheader('All Matchups')
+        df_all_matchups = pd.DataFrame(all_matchups)
+        st.dataframe(
+            df_all_matchups,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Home Score": st.column_config.NumberColumn(format="%.2f"),
+                "Away Score": st.column_config.NumberColumn(format="%.2f")
             }
         )
